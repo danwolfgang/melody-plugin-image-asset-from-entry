@@ -1,0 +1,12 @@
+name: 'Image Asset From Entry'
+id: imageassetfromentry
+key: imageassetfromentry
+description: "Import image assets from XML-RPC posts and existing entries into Melody."
+version: 1.0
+author_name: 'Dan Wolfgang'
+author_link: http://danandsherree.com
+
+callbacks:
+    api_post_save.entry: $ImageAssetFromEntry::ImageAssetFromEntry::Plugin::save
+    cms_post_save.entry: $ImageAssetFromEntry::ImageAssetFromEntry::Plugin::save
+
