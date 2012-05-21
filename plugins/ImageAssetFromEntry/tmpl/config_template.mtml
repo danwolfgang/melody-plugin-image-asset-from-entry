@@ -1,0 +1,10 @@
+<mtapp:setting
+    id="process_url"
+    label="Process URL"
+    hint="Any non-local image URLs found in the Entry Body will be processed, creating a new Image Asset, and an Entry-Asset association. The Entry Body contents can be modified to suit your needs."
+    show_hint="1">
+        <input type="radio" name="process_url" value="replace" id="process_url-replace" <mt:If name="process_url" eq="replace">checked</mt:If> />
+            <label for="process_url-replace">Replace the URL in the Entry Body with the URL of the new Asset</label><br />
+        <input type="radio" name="process_url" value="remove" id="process_url-remove" <mt:If name="process_url" eq="remove">checked</mt:If> />
+            <label for="process_url-remove">Remove the URL from the Entry Body</label>
+</mtapp:setting>

@@ -10,3 +10,9 @@ callbacks:
     api_post_save.entry: $ImageAssetFromEntry::ImageAssetFromEntry::Plugin::save
     cms_post_save.entry: $ImageAssetFromEntry::ImageAssetFromEntry::Plugin::save
 
+settings:
+    process_url:
+        default: 'replace'
+        scope: blog
+
+blog_config_template: config_template.mtml

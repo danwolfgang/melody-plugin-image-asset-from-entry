@@ -24,32 +24,31 @@ sub save {
 
     # Search the entry for any images and grab the image src URL. This will 
     # return an array of only the non-local image URLs.
-    my @images = _find_images($text, $obj->blog_id);
+    my @images = _find_images({
+        text    => $text,
+        blog_id => $obj->blog_id,
+    });
 
+    # Update the Entry Body field based upon the users preference.
+    my $process_url_pref = $plugin->get_config_value(
+        'process_url',
+        'blog:'.$obj->blog_id
+    );
+
+    # Process each image URL found in the Entry Body: create an asset,
+    # associate it with the entry, log it, and update the Entry Body.
     foreach my $image (@images) {
-
-        # Save the image locally and turn it into an asset.
-        my $asset = _convert_to_asset($image, $obj->blog_id);
-        next unless $asset && $asset->id;
-
-        # Update the ObjectAsset table to create the entry-asset link.
-        $asset->associate( $obj, 0 );
-        
-        MT->log({
-            level   => MT->model('log')->INFO(),
-            blog_id => $obj->blog_id,
-            message => "Image Asset From Entry created a new asset, "
-                . $asset->label . ", from the image at $image.",
+        $text = _process_image({
+            text             => $text,
+            image            => $image,
+            obj              => $obj,
+            blog_id          => $obj->blog_id,
+            process_url_pref => $process_url_pref,
         });
-
-        # Update the image in the entry with the URL of the saved asset.
-        # Just a regex to change the old URL to the new URL.
-        my $asset_url = $asset->url;
-        $text =~ s/$image/$asset_url/g;
     }
-    
-    # Copy the updated text with new image URL back into the text field, and
-    # save that.
+
+    # Copy the updated text with new image URL back into the text field,
+    # and save that.
     $obj->text( $text );
 
     # Save the object with the updated text. Also, this is responsible for 
@@ -60,17 +59,19 @@ sub save {
 }
 
 sub _find_images {
-    my ($text, $blog_id) = @_;
+    my ($arg_ref) = @_;
+    my $text    = $arg_ref->{text};
+    my $blog_id = $arg_ref->{blog_id};
     my @images;
 
     # Give up if this text field is empty.
     return if !$text;
-    
+
     # Grab the blog so that we can compare the the published blog root to 
     # the image's src URL.
     my $blog = MT->model('blog')->load($blog_id);
     my $blog_site_url = $blog->site_url;
-    
+
     # Extract images.
     my $html = HTML::TokeParser->new( \$text );
     while ( my $image_tag = $html->get_tag('img') ) {
@@ -84,7 +85,60 @@ sub _find_images {
         }
     }
 
+    # Also try searching the text for a bare URL on its own line -- a likely
+    # scenario if the user wants to remove the original URL from the Entry
+    # Body.
+    $text =~ s{ \A (http[^\r\n]+) [\r\n]* }{}xms;
+    my $image_src = $1; # Grab the URL we found.
+    push @images, $image_src;
+
     return @images;
+}
+
+# Process an image URL found in the Entry Body: create an asset, associate it
+# with the entry, log it, and update the Entry Body.
+sub _process_image {
+    my ($arg_ref) = @_;
+    my $text             = $arg_ref->{text};
+    my $image            = $arg_ref->{image};
+    my $obj              = $arg_ref->{obj};
+    my $blog_id          = $arg_ref->{blog_id};
+    my $process_url_pref = $arg_ref->{process_url_pref};
+
+    # Save the image locally and turn it into an asset.
+    my $asset = _convert_to_asset($image, $blog_id);
+    next unless $asset && $asset->id;
+
+    # Update the ObjectAsset table to create the entry-asset link.
+    my $object_asset = MT->model('objectasset')->new;
+    $object_asset->object_ds( $obj->class_type );
+    $object_asset->object_id( $obj->id );
+    $object_asset->asset_id( $asset->id );
+    $object_asset->blog_id( $blog_id );
+    $object_asset->save
+        or return $asset->error("Failed to associate object with asset");
+
+    MT->log({
+        level   => MT->model('log')->INFO(),
+        blog_id => $blog_id,
+        message => "Image Asset From Entry created a new asset, "
+            . $asset->label . ", from the image at $image.",
+    });
+
+    if ( $process_url_pref eq 'replace' ) {
+        # Update the image in the entry with the URL of the saved asset.
+        # Just a regex to change the old URL to the new URL.
+        my $asset_url = $asset->url;
+        $text =~ s/$image/$asset_url/g;
+    }
+    elsif ( $process_url_pref eq 'remove' ) {
+        # Remove the URL from the Entry Body entirely. Strip any leading
+        # or trailing whitespace, also, because if the URL is supposed to
+        # be removed it is likely on its own line anyway.
+        $text =~ s/\s*$image\s*//g;
+    }
+
+    return $text;
 }
 
 sub _convert_to_asset {
@@ -166,7 +220,7 @@ sub _convert_to_asset {
 
     MT->run_callbacks(
         'api_upload_image',
-        {File       => $dest_file_path,
+        File       => $dest_file_path,
         file       => $dest_file_path,
         Url        => $asset->url,
         url        => $asset->url,
@@ -183,7 +237,7 @@ sub _convert_to_asset {
         ImageType  => $id,
         image_type => $id,
         Blog       => $blog,
-        blog       => $blog}
+        blog       => $blog
     );
 
     return $asset;
@@ -196,13 +250,13 @@ sub _check_assetfileextensions {
     my $app = MT->instance;
 
     if ( my $allow_exts = $app->config('AssetFileExtensions') ) {
-        
+
         # Split the parameters of the AssetFileExtensions configuration 
         # directive into items in an array
         my @allowed = map { 
             if ( $_ =~ m/^\./ ) { qr/$_/i } else { qr/\.$_/i } 
         } split '\s?,\s?', $allow_exts;
-        
+
         # Find the extension in the array
         my @found = grep(/\b$ext\b/, @allowed);
 
