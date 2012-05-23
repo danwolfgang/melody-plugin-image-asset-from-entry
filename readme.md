@@ -1,10 +1,11 @@
 # Image Asset from Entry Overview
 
-The Image Asset from Entry plugin for Melody will look in the Entry Body for a
-non-local image URL. If found, that image URL is used to create a new image
-asset in Melody. Finally, that new image asset replaces the original image URL
-and an asset-entry association is created (to add the asset to the Entry Asset
-Manager).
+The Image Asset from Entry plugin for Melody and Movable Type will look in the
+Entry Body for a non-local image URL. If found, that image URL is used to 
+create a new image asset in Melody. An asset-entry association is created (to
+add the asset to the Entry Asset Manager). The resulting asset URL can replace
+the original, or the original URL can simply be removed. Lastly, the new asset
+can be associated with an Image Custom Field.
 
 I wrote this plugin specifically to help me publish my photos on Flickr to my
 blog: when an entry is published through the XML-RPC API to the blog, normally
