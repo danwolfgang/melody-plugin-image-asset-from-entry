@@ -14,5 +14,8 @@ settings:
     process_url:
         default: 'replace'
         scope: blog
+    dest_cf_basename:
+        scope: blog
 
-blog_config_template: config_template.mtml
+blog_config_template:
+    code: $ImageAssetFromEntry::ImageAssetFromEntry::Plugin::blog_config_template

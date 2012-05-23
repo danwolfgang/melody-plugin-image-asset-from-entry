@@ -14,6 +14,35 @@ use Image::Size;
 
 use Data::Dumper;
 
+# Build the config template.
+sub blog_config_template {
+    my ($plugin, $param, $scope) = @_;
+    my $app = MT->instance;
+    my $blog_id = $app->blog->id;
+
+    # If this is MT Pro, custom fields might be in use. Look in the current
+    # blog and at the system level for any `asset.image` custom field, and let
+    # the user pick it, if they want.
+    if ( $app->component('Commercial') ) {
+        my @fields = MT->model('field')->load(
+            {
+                blog_id  => [$blog_id, '0'],
+                obj_type => 'entry',
+                type     => 'asset.image',
+            },
+            {
+                sort      => 'basename', # The `name` column isn't sortable?
+                direction => 'ascend',
+            }
+        );
+
+        $param->{available_cfs} = \@fields;
+    }
+
+    $plugin->load_tmpl('config_template.mtml', $param);
+}
+
+# Running from the `api_post_save.entry` or `cms_post_save.entry` callbacks.
 sub save {
     my ($cb, $app, $obj, $original) = @_;
     my $plugin = $cb->plugin;
@@ -35,6 +64,13 @@ sub save {
         'blog:'.$obj->blog_id
     );
 
+    # if the image is to be saved to a custom field, we need to get that CF
+    # basename to hand off for processing.
+    my $dest_cf_basename = $plugin->get_config_value(
+        'dest_cf_basename',
+        'blog:'.$obj->blog_id
+    );
+
     # Process each image URL found in the Entry Body: create an asset,
     # associate it with the entry, log it, and update the Entry Body.
     foreach my $image (@images) {
@@ -44,6 +80,7 @@ sub save {
             obj              => $obj,
             blog_id          => $obj->blog_id,
             process_url_pref => $process_url_pref,
+            dest_cf_basename => $dest_cf_basename,
         });
     }
 
@@ -51,7 +88,7 @@ sub save {
     # and save that.
     $obj->text( $text );
 
-    # Save the object with the updated text. Also, this is responsible for 
+    # Save the object with the updated text. Also, this is responsible for
     # putting the $objectasset into effect.
     $obj->save or die $obj->errstr;
 
@@ -104,6 +141,7 @@ sub _process_image {
     my $obj              = $arg_ref->{obj};
     my $blog_id          = $arg_ref->{blog_id};
     my $process_url_pref = $arg_ref->{process_url_pref};
+    my $dest_cf_basename = $arg_ref->{dest_cf_basename};
 
     # Save the image locally and turn it into an asset.
     my $asset = _convert_to_asset($image, $blog_id);
@@ -136,6 +174,39 @@ sub _process_image {
         # or trailing whitespace, also, because if the URL is supposed to
         # be removed it is likely on its own line anyway.
         $text =~ s/\s*$image\s*//g;
+    }
+
+    # Associate the image with a custom field, if necessary.
+    if ( $dest_cf_basename ) {
+        # Try to load the Custom Field -- being specific about the blog ID,
+        # object type, and field type will let us be sure we've got something
+        # that works.
+        my $cf = MT->model('field')->load({
+            blog_id => [$blog_id, '0'],
+            obj_type => 'entry',
+            type     => 'asset.image',
+            basename => $dest_cf_basename,
+        });
+
+        # Since a valid CF was found we should create the meta column and
+        # enter the data!
+        if ( $cf ) {
+            my $basename = 'field.' . $cf->basename;
+
+            my %arg;
+            $arg{Width} = '240';
+            $arg{Height} = '240';
+            my ($url, $w, $h) = $asset->thumbnail_url(%arg);
+            my $img_tag = ($url) 
+                ? '<img src="'.$url.'" alt="" />'
+                : 'View Image';
+
+            $obj->$basename(
+                '<form mt:asset-id="' . $asset->id . '" class="mt-enclosure '
+                . 'mt-enclosure-image" style="display: inline;"><a href="'
+                . $asset->url . '">' . $img_tag . '</a></form>'
+            );
+        }
     }
 
     return $text;
