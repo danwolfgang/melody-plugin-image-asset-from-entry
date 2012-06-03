@@ -11,6 +11,11 @@ I wrote this plugin specifically to help me publish my photos on Flickr to my
 blog: when an entry is published through the XML-RPC API to the blog, normally
 the Flickr image URL is displayed in the entry.
 
+If a Flickr URL is supplied, this plugin will also update the URL to grab the
+"Large" size image (1024 pixels wide). Using the Large image makes it easy to
+get exactly the size image you need because it's a big-ish file that can be
+sized with the AssetThumbnailURL tag to any dimensions required.
+
 This plugin works for entries created through the API, and also works when on
 the Edit Entry screen: save an entry and the Entry Body is reviewed for any
 non-local image URLs that can be converted into image assets.

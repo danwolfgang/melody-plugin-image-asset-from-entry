@@ -255,8 +255,9 @@ sub _convert_to_asset {
     }
 
     # Get the image and save it locally.
-    my $image_headers = LWP::Simple::head($image);
-    my $http_response = LWP::Simple::getstore( $image, $dest_file_path );
+    my $image_url = _is_from_flickr({ image => $image });
+    my $image_headers = LWP::Simple::head($image_url);
+    my $http_response = LWP::Simple::getstore( $image_url, $dest_file_path );
 
     # If the file was not successfully gotten or saved, report it and give up.
     if ( $http_response != 200 ) {
@@ -312,6 +313,25 @@ sub _convert_to_asset {
     );
 
     return $asset;
+}
+
+# If the URL is pointing to a Flickr URL, we want to try to grab the biggest
+# version of the image available by adding the `_b` to the URL.
+# Standard: http://farm9.staticflickr.com/8159/7322097392_ca23231507.jpg
+# Large:    http://farm9.staticflickr.com/8159/7322097392_ca23231507_b.jpg
+sub _is_from_flickr {
+    my ($arg_ref) = @_;
+    my $image = $arg_ref->{image};
+
+    # Not from Flickr? Give up.
+    return $image if ($image !~ m/flickr\.com/);
+
+    $image =~ m/(.*)(\.jpg)/;
+    my $url = $1;
+    my $ext = $2;
+
+    # Assemble the URL with the identifier to grab the large image.
+    return $image = $url . '_b' . $ext;
 }
 
 # Use the AssetFileExtensions config directive to check that the filename

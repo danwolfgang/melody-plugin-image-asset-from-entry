@@ -2,7 +2,7 @@ name: 'Image Asset From Entry'
 id: imageassetfromentry
 key: imageassetfromentry
 description: "Import image assets from XML-RPC posts and existing entries into Melody and Movable Type."
-version: 2.0.0
+version: 2.0.1
 author_name: 'Dan Wolfgang'
 author_link: http://danandsherree.com
 
